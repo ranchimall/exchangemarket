@@ -1,6 +1,6 @@
 'use strict';
 
-(function (EXPORTS) { //floExchangeAPI v1.2.0a
+(function (EXPORTS) { //floExchangeAPI v1.2.1
     const exchangeAPI = EXPORTS;
 
     const DEFAULT = {
@@ -608,7 +608,7 @@
         BOBS_FUND: "bobs-fund"
     }
 
-    exchangeAPI.getSink = function (service = serviceList.EXCHANGE) {
+    const getSink = exchangeAPI.getSink = function (service = serviceList.EXCHANGE) {
         return new Promise((resolve, reject) => {
             if (!(Object.values(serviceList).includes(service)))
                 return reject(ExchangeError(ExchangeError.BAD_REQUEST_CODE, 'service required', errorCode.INVALID_VALUE));
@@ -1720,7 +1720,7 @@
 
     const _l = key => DEFAULT.marketApp + '-' + key;
 
-    exchangeAPI.init = function refreshDataFromBlockchain() {
+    function refreshDataFromBlockchain() {
         return new Promise((resolve, reject) => {
             let nodes, trusted = new Set(), assets, tags, lastTx;
             try {
@@ -1796,6 +1796,17 @@
         })
     }
 
+    exchangeAPI.init = function (service = serviceList.EXCHANGE) {
+        return new Promise((resolve, reject) => {
+            refreshDataFromBlockchain().then(nodes => {
+                getSink(service)
+                    .then(sinkID => floCrypto.validateAddr(sinkID) ? _sinkID = sinkID : undefined)
+                    .catch(error => console.warn("Unable to fetch sinkID", error))
+                    .finally(_ => resolve(nodes))
+            }).catch(error => reject(error))
+        })
+    }
+
     const config = exchangeAPI.config = {
         get trustedList() {
             return new Set((localStorage.getItem(_l('trusted')) || "").split(','));
@@ -1820,12 +1831,10 @@
     }
 
     //container for user ID and proxy private-key
+    var _userID, _publicKey, _privateKey, _sinkID;
     const proxy = exchangeAPI.proxy = {
-        user: null,
-        private: null,
-        public: null,
         async lock() {
-            if (!this.private)
+            if (!_privateKey)
                 return notify("No proxy key found!", 'error');
             getPromptInput("Add password", 'This password applies to this browser only!', {
                 isPassword: true,
@@ -1836,7 +1845,7 @@
                 else if (pwd.length < 4)
                     notify("Password minimum length is 4", 'error');
                 else {
-                    let tmp = Crypto.AES.encrypt(this.private, pwd);
+                    let tmp = Crypto.AES.encrypt(_privateKey, pwd);
                     localStorage.setItem(_l('proxy_secret'), "?" + tmp);
                     notify("Successfully locked with Password", 'success');
                 }
@@ -1845,35 +1854,37 @@
         clear() {
             localStorage.removeItem(_l('proxy_secret'));
             localStorage.removeItem(_l('user_ID'));
-            this.user = null;
-            this.private = null;
-            this.public = null;
+            _userID = null;
+            _privateKey = null;
+            _publicKey = null;
         },
         get sinkID() {
-            return getRef("sink_id").value;
+            return _sinkID;
         },
         set userID(id) {
             localStorage.setItem(_l('user_ID'), id);
-            this.user = id;
+            _userID = id;
         },
         get userID() {
-            if (this.user)
-                return this.user;
+            if (_userID)
+                return _userID;
             else {
                 let id = localStorage.getItem(_l('user_ID'));
-                return id ? this.user = id : undefined;
+                return id ? _userID = id : undefined;
             }
+        },
+        get user() {
+            return this.userID;
         },
         set secret(key) {
             localStorage.setItem(_l('proxy_secret'), key);
-            this.private = key;
-            this.public = floCrypto.getPubKeyHex(key);
+            _privateKey = key;
+            _publicKey = floCrypto.getPubKeyHex(key);
         },
         get secret() {
-            const self = this;
             return new Promise((resolve, reject) => {
-                if (self.private)
-                    return resolve(self.private);
+                if (_privateKey)
+                    return resolve(_privateKey);
 
                 const Reject = reason => {
                     notify(reason, 'error');
@@ -1881,9 +1892,9 @@
                 }
                 const setValues = priv => {
                     try {
-                        self.private = priv;
-                        self.public = floCrypto.getPubKeyHex(priv);
-                        resolve(self.private);
+                        _privateKey = priv;
+                        _publicKey = floCrypto.getPubKeyHex(priv);
+                        resolve(_privateKey);
                     } catch (error) {
                         Reject("Unable to fetch Proxy secret");
                     }
