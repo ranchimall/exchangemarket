@@ -842,7 +842,6 @@
             <h4 id="portfolio_popup__title" class="capitalize"></h4>
         </header>
         <sm-form id="portfolio_form">
-            <input type="text" id="sink_id" style="display: none;" hidden />
             <sm-input id="get_receiver_id" placeholder="Receiver FLO ID" error-text="Invalid FLO ID" data-flo-id
                 required animate></sm-input>
             <sm-input id="get_user_amount" placeholder="Quantity" type="number" min="0.00000001" step="0.00000001"
@@ -2120,7 +2119,7 @@
                 entry.querySelector('.history-entry__token-action').textContent = `${type} ${asset}`
                 entry.querySelector('.history-entry__amount').textContent = amount
                 entry.querySelector('.history-entry__time').textContent = getFormattedTime(locktime)
-                entry.querySelector('.history-entry__txid').href = `https://flosight.duckdns.org/tx/${txid}`
+                entry.querySelector('.history-entry__txid').href = floBlockchainAPI.current_server + `tx/${txid}`
                 return entry;
             }
         }
@@ -2823,7 +2822,6 @@
                 document.querySelectorAll(".user-content").forEach(elem => elem.classList.remove('hidden'))
                 document.querySelectorAll(".my-flo-id").forEach(elem => elem.textContent = acc.floID)
                 getRef("user_id").value = acc.floID;
-                getRef("sink_id").value = acc.sinkID;
                 if (acc.subAdmin)
                     console.info("logged in as subAdmin");
 
