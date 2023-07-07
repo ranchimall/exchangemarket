@@ -118,7 +118,7 @@ function sendAsset(floID, asset, quantity, type, id) {
                 balance_locked[sinkID][asset] -= quantity;
             });
         }
-        collectAndCall(sinkID, callback); //TODO: add timeout to prevent infinite wait
+        collectAndCall(SINK_GROUP[type], sinkID, callback); //TODO: add timeout to prevent infinite wait
         callbackCollection[type][id] = callback;
         if (!(sinkID in balance_locked))
             balance_locked[sinkID] = {};
