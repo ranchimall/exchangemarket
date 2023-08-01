@@ -2813,7 +2813,6 @@
             floExchangeAPI.getAccount(proxy.userID, await proxy.secret).then(async acc => {
                 document.body.classList.add('is-signed-in');
                 getRef('market_asset_rates').parentNode.remove()
-                location.hash = `#/exchange`
                 getRef('user_popup_button').addEventListener('click', () => openPopup('user_popup'));
                 getRef('trade_button').addEventListener('click', () => openPopup('confirm_trade_popup'));
                 accountDetails = acc
