@@ -1,0 +1,32 @@
+name: Workflow push to Dappbundle
+on: [push]
+jobs:
+  build:
+    name: Build
+    runs-on: self-hosted
+    steps:
+      - name: Executing remote command
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.R_HOST }}
+          username: ${{ secrets.P_USERNAME }}
+          password: ${{ secrets.P_PASSWORD }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            if [ -d "${{ secrets.DEPLOYMENT_LOCATION}}/dappbundle" ]; then
+              echo "Folder exists. Skipping Git clone."
+            else
+              echo "Folder does not exist. Cloning repository..."
+              cd ${{ secrets.DEPLOYMENT_LOCATION}}/ && git clone https://github.com/ranchimall/dappbundle.git 
+            fi
+
+            if [ -d "${{ secrets.DEPLOYMENT_LOCATION}}/dappbundle/${{ github.event.repository.name }}" ]; then
+              echo "Repository exists. Remove folder "
+              rm -r "${{ secrets.DEPLOYMENT_LOCATION}}/dappbundle/${{ github.event.repository.name }}"
+            fi
+
+            echo "Cloning repository..."
+            cd ${{ secrets.DEPLOYMENT_LOCATION}}/dappbundle && git clone https://github.com/ranchimall/${{ github.event.repository.name }}
+
+            cd "${{ secrets.DEPLOYMENT_LOCATION}}/dappbundle/${{ github.event.repository.name }}" && rm -rf .gitattributes .git .github .gitignore
+            cd ${{ secrets.DEPLOYMENT_LOCATION}}/dappbundle/ && git add . && git commit -m "Workflow updating files of ${{ github.event.repository.name }}" && git push "https://ranchimalldev:${{ secrets.RM_ACCESS_TOKEN }}@github.com/ranchimall/dappbundle.git"
