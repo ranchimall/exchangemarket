@@ -27,7 +27,6 @@ body {
   scrollbar-gutter: stable;
   color: rgba(var(--text-color), 1);
   background-color: rgba(var(--background-color), 1);
-  transition: background-color 0.3s;
 }
 
 body[data-theme=dark] {
@@ -737,7 +736,6 @@ sm-checkbox {
   padding: 1rem 0;
   border-radius: 0.5rem;
   font-weight: 400;
-  transition: background-color 0.3s;
   -webkit-user-select: none;
      -moz-user-select: none;
           user-select: none;
@@ -871,7 +869,6 @@ sm-checkbox {
   top: 0;
   background-color: rgba(var(--background-color), 1);
   z-index: 2;
-  transition: background-color 0.3s;
 }
 
 .list__item {
@@ -1577,7 +1574,6 @@ sm-checkbox {
     flex: 0;
     flex-direction: row;
     border-radius: 0.5rem;
-    transition: background-color 0.3s;
   }
   .main_navbar__item .icon {
     margin-bottom: 0;
