@@ -129,20 +129,24 @@ function confirmDepositToken() {
 verifyTx.token = function (sender, txid, group, currencyOnly = false) {
     return new Promise((resolve, reject) => {
         floTokenAPI.getTx(txid).then(tx => {
-            if (tx.parsedFloData.type !== "transfer")
+            if (tx.type !== "transfer")
                 return reject([true, "Transaction type not 'transfer'"]);
-            else if (tx.parsedFloData.transferType !== "token")
+            else if (tx.transferType !== "token")
                 return reject([true, "Transaction transfer is not 'token'"]);
-            var token = tx.parsedFloData.tokenIdentification,
-                amount = tx.parsedFloData.tokenAmount;
+            var token = tx.tokenIdentification,
+                amount = tx.tokenAmount,
+                receiverAddress = tx.receiverAddress,
+                senderAddress = tx.senderAddress;
             if (currencyOnly && token !== floGlobals.currency)
                 return reject([true, "Token not currency"]);
             else if (!currencyOnly && ((!assetList.includes(token) && token !== floGlobals.currency) || token === "FLO"))
                 return reject([true, "Token not authorised"]);
-            let vin_sender = tx.transactionDetails.vin.filter(v => v.addr === sender)
-            if (!vin_sender.length)
+            //let vin_sender = tx.vin.filter(v => v.addr === sender)
+            if (senderAddress != sender)
                 return reject([true, "Transaction not sent by the sender"]);
-            let flo_amount = tx.transactionDetails.vout.reduce((a, v) => keys.sink_chest.includes(group, v.scriptPubKey.addresses[0]) ? a + v.value : a, 0);
+            if (!keys.sink_chest.includes(group, receiverAddress))
+                return reject([true, "Transaction receiver is not market ID"]); //Maybe reject as false? (to compensate delay in chestsList loading from other nodes)
+            let flo_amount = tx.vout.reduce((a, v) => keys.sink_chest.includes(group, v.scriptPubKey.addresses[0]) ? a + v.value : a, 0);
             if (flo_amount == 0)
                 return reject([true, "Transaction receiver is not market ID"]); //Maybe reject as false? (to compensate delay in chestsList loading from other nodes)
             else
@@ -185,7 +189,7 @@ function confirmVaultWithdraw() {
                     }).catch(error => console.error(error));
             } else if (r.asset_type == pCode.ASSET_TYPE_TOKEN)
                 floTokenAPI.getTx(r.txid).then(tx => {
-                    if (!tx.transactionDetails.blockheight || !tx.transactionDetails.confirmations) //Still not confirmed
+                    if (!tx.blockheight || !tx.confirmations) //Still not confirmed
                         return;
                     DB.query("UPDATE VaultTransactions SET r_status=? WHERE id=?", [pCode.STATUS_SUCCESS, r.id])
                         .then(result => console.info("Token withdrawed:", r.floID, r.asset, r.amount))
@@ -286,7 +290,7 @@ function confirmConvert() {
                 }).catch(error => console.error(error));
             else if (r.mode == pCode.CONVERT_MODE_PUT)
                 floTokenAPI.getTx(r.out_txid).then(tx => {
-                    if (!tx.transactionDetails.blockheight || !tx.transactionDetails.confirmations) //Still not confirmed
+                    if (!tx.blockheight || !tx.confirmations) //Still not confirmed
                         return;
                     DB.query("UPDATE DirectConvert SET r_status=? WHERE id=?", [pCode.STATUS_SUCCESS, r.id])
                         .then(result => console.info(`${r.floID} converted ${r.quantity} BTC to ${r.amount}`))
@@ -350,7 +354,7 @@ function confirmConvertFundWithdraw() {
                 }).catch(error => console.error(error));
             } else if (r.mode == pCode.CONVERT_MODE_PUT) {//withdraw currency
                 floTokenAPI.getTx(r.txid).then(tx => {
-                    if (!tx.transactionDetails.blockheight || !tx.transactionDetails.confirmations) //Still not confirmed
+                    if (!tx.blockheight || !tx.confirmations) //Still not confirmed
                         return;
                     DB.query("UPDATE ConvertFund SET r_status=? WHERE id=?", [pCode.STATUS_SUCCESS, r.id])
                         .then(result => console.info(`Withdraw-fund ${r.amount} ${floGlobals.currency} successful`))
@@ -407,7 +411,7 @@ function confirmConvertRefund() {
                     }).catch(error => console.error(error));
             } else if (r.ASSET_TYPE_TOKEN)
                 floTokenAPI.getTx(r.out_txid).then(tx => {
-                    if (!tx.transactionDetails.blockheight || !tx.transactionDetails.confirmations) //Still not confirmed
+                    if (!tx.blockheight || !tx.confirmations) //Still not confirmed
                         return;
                     DB.query("UPDATE RefundConvert SET r_status=? WHERE id=?", [pCode.STATUS_SUCCESS, r.id])
                         .then(result => console.info(`Refunded ${r.amount} ${r.asset} to ${r.floID}`))
