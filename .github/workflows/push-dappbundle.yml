@@ -1,68 +1,58 @@
-name: Workflow push to Dappbundle
-on: [push]
+- name: Install OpenSSH client (if needed)
+  run: |
+    if ! command -v ssh >/dev/null 2>&1; then
+      sudo apt-get update
+      sudo apt-get install -y openssh-client
+    fi
 
-jobs:
-  build:
-    name: Build
-    runs-on: self-hosted
-    steps:
-      # Optional diagnostics — helps confirm which runner ran and whether Docker perms are OK
-      - name: Print runner info
-        run: |
-          echo "Runner name: $RUNNER_NAME"
-          echo "Runner OS:   $RUNNER_OS"
-          echo "Runner arch: $RUNNER_ARCH"
-          echo "Runner user: $(whoami)"
-          echo "Runner groups: $(id -nG)"
-          docker --version || echo "Docker not found"
-          ls -l /var/run/docker.sock || true
-          docker ps >/dev/null 2>&1 && echo "docker ps OK" || echo "docker ps failed (permission?)"
+- name: Run remote script over SSH
+  env:
+    R_HOST: ${{ secrets.R_HOST }}
+    P_USERNAME: ${{ secrets.P_USERNAME }}
+    P_PASSWORD: ${{ secrets.P_PASSWORD }}
+    SSH_PORT: ${{ secrets.SSH_PORT }}
+  run: |
+    # If you must use password auth, install sshpass (prefer SSH keys in the long run)
+    if ! command -v sshpass >/dev/null 2>&1; then
+      sudo apt-get update
+      sudo apt-get install -y sshpass
+    fi
 
-      - name: Executing remote command
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.R_HOST }}
-          username: ${{ secrets.P_USERNAME }}
-          password: ${{ secrets.P_PASSWORD }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
-            set -euo pipefail
+    sshpass -p "$P_PASSWORD" ssh \
+      -o StrictHostKeyChecking=no \
+      -o UserKnownHostsFile=/dev/null \
+      -p "$SSH_PORT" "$P_USERNAME@$R_HOST" bash -s <<'REMOTE'
+      set -euo pipefail
 
-            # 1) Ensure dappbundle exists
-            if [ -d "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle" ]; then
-              echo "Folder exists. Skipping Git clone."
-            else
-              echo "Folder does not exist. Cloning repository..."
-              cd "${{ secrets.DEPLOYMENT_LOCATION }}/" && git clone https://github.com/ranchimall/dappbundle.git
-            fi
+      if [ -d "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle" ]; then
+        echo "Folder exists. Skipping Git clone."
+      else
+        echo "Folder does not exist. Cloning repository..."
+        cd "${{ secrets.DEPLOYMENT_LOCATION }}/" && git clone https://github.com/ranchimall/dappbundle.git
+      fi
 
-            # Optional: ensure identity is set once, avoids commit failures if not configured
-            cd "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle"
-            git config user.name  "ranchimall-bot" || true
-            git config user.email "bot@ranchimall.net" || true
+      cd "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle"
+      git config user.name  "ranchimall-bot" || true
+      git config user.email "bot@ranchimall.net" || true
 
-            # 2) Remove old copy of target repo folder
-            if [ -d "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle/${{ github.event.repository.name }}" ]; then
-              echo "Repository exists. Remove folder"
-              rm -rf "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle/${{ github.event.repository.name }}"
-            fi
+      if [ -d "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle/${{ github.event.repository.name }}" ]; then
+        echo "Repository exists. Remove folder"
+        rm -rf "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle/${{ github.event.repository.name }}"
+      fi
 
-            # 3) Clone fresh copy of the source repo into dappbundle
-            echo "Cloning repository..."
-            cd "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle" && \
-              git clone --depth=1 "https://github.com/ranchimall/${{ github.event.repository.name }}"
+      echo "Cloning repository..."
+      cd "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle" && \
+        git clone --depth=1 "https://github.com/ranchimall/${{ github.event.repository.name }}"
 
-            # 4) Strip Git metadata from the inner repo (kept exactly as in your script)
-            cd "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle/${{ github.event.repository.name }}" && \
-              rm -rf .gitattributes .git .github .gitignore
+      cd "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle/${{ github.event.repository.name }}" && \
+        rm -rf .gitattributes .git .github .gitignore
 
-            # 5) Stage everything, commit iff there are changes, then push
-            cd "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle"
-            git add -A .
-
-            if git diff --cached --quiet; then
-              echo "No changes detected. Skipping commit and push."
-            else
-              git commit -m "Workflow updating files of ${{ github.event.repository.name }}"
-              git push "https://ranchimalldev:${{ secrets.RM_ACCESS_TOKEN }}@github.com/ranchimall/dappbundle.git"
-            fi
+      cd "${{ secrets.DEPLOYMENT_LOCATION }}/dappbundle"
+      git add -A .
+      if git diff --cached --quiet; then
+        echo "No changes detected. Skipping commit and push."
+      else
+        git commit -m "Workflow updating files of ${{ github.event.repository.name }}"
+        git push "https://ranchimalldev:${{ secrets.RM_ACCESS_TOKEN }}@github.com/ranchimall/dappbundle.git"
+      fi
+REMOTE
