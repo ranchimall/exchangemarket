@@ -6,7 +6,7 @@
     const DEFAULT = {
         blockchain: floGlobals.blockchain,
         apiURL: {
-            FLO: ['https://blockbook.flocard.app/'],
+            FLO: ['https://blockbook.ranchimall.net/','https://blockbook.flocard.app/'],
             FLO_TEST: ['https://blockbook-testnet.ranchimall.net/']
         },
         sendAmt: 0.0003,
